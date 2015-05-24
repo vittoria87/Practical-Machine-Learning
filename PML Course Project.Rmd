@@ -1,0 +1,72 @@
+#Practical Machine Learning Course Project
+
+Author: Viktoriya Medvinskaya
+
+Date: May 25, 2015
+
+##Loading and Cleaning Data
+
+We'll start from loading necessary packages, setting working directory and then loading training and test data: 
+```{r, cache=TRUE}
+library(caret)
+library(randomForest)
+
+setwd("C:/Users/VMedvinskaya/Desktop/Data Science/8. Practical Machine Learning/Course Project")
+
+main_training <- read.csv("pml-training.csv", na.strings = c("NA", ""))
+main_testing <- read.csv("pml-testing.csv", na.strings = c("NA", ""))
+```
+
+Since we found that a number of features is mostly filled with NA's, so unlikely would be useful for prediction, we eliminate such columns from the dataset to be analyzed. We eliminate first seven columns as well (like timestamps, user's name etc.):
+```{r, cache=TRUE}
+NoNA_features <- colnames(main_training[colSums(is.na(main_training)) == 0])
+main_training.short <- main_training[,NoNA_features]
+main_training.short <- main_training.short[,-(1:7)]
+str(main_training.short)
+```
+
+##Training the model
+
+Now we split the main training set to training and test parts:
+```{r, cache=TRUE}
+set.seed(1234)
+inTrain <- createDataPartition(y=main_training.short$classe, p=0.6, list=FALSE)
+training <- main_training.short[inTrain,]
+testing <- main_training.short[-inTrain,]
+```
+
+We train a predictive model using random forest method with cross validation:
+```{r, cache=TRUE}
+trCtrl = trainControl(method = "cv", number = 4)
+modelFit <- train(classe ~ ., data = training, method = "rf", trControl = trCtrl)
+modelFit$finalModel
+```
+
+## Checking the accuracy
+
+We check our model using the test part of the main dataset:
+```{r, cache=TRUE}
+predictions <- predict(modelFit, newdata = testing)
+confusionMatrix(predictions, testing$classe)
+```
+
+We see that the accuracy of model is about 99%, so we may expect out of sample error to be less than 1%. Sensitivity and specificity in each of the classes prediction are about 97-99%. 
+
+## Prediction 
+
+Finally, we predict classes for the 20 test cases and generate files for submission to Coursera.
+```{r, cache=TRUE}
+predict_main <- predict(modelFit, newdata = main_testing)
+
+pml_write_files = function(x){
+        n = length(x)
+        for(i in 1:n){
+                filename = paste0("problem_id_",i,".txt")
+                write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+        }
+}
+
+pml_write_files(predict_main)
+```
+
+
